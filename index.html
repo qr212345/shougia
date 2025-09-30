@@ -1,0 +1,1851 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>将棋×カードバトル - ShogiCard Masters</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 1400px;
+            padding: 20px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ゲームステート管理 */
+        .game-state {
+            display: none;
+        }
+
+        .game-state.active {
+            display: block;
+        }
+
+        /* ホーム画面 */
+        .home-screen {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .game-title {
+            font-size: 48px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 40px 0;
+        }
+
+        .menu-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 20px;
+            border-radius: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .menu-button:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .menu-button:active {
+            transform: translateY(0);
+        }
+
+        .menu-icon {
+            font-size: 32px;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        /* ゲームボード */
+        .game-board-container {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .board-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .shogi-board {
+            display: grid;
+            grid-template-columns: repeat(9, 60px);
+            grid-template-rows: repeat(9, 60px);
+            gap: 1px;
+            background: #8B4513;
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .board-cell {
+            background: #F5DEB3;
+            border: 1px solid #8B4513;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .board-cell:hover {
+            background: #FFE4B5;
+            transform: scale(1.05);
+            z-index: 1;
+        }
+
+        .board-cell.selected {
+            background: #90EE90;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+        }
+
+        .board-cell.valid-move {
+            background: #ADD8E6;
+            animation: validPulse 1s infinite;
+        }
+
+        @keyframes validPulse {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+
+        .piece {
+            font-size: 36px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .piece.player1 {
+            color: #2C3E50;
+        }
+
+        .piece.player2 {
+            color: #E74C3C;
+            transform: rotate(180deg);
+        }
+
+        .piece:hover {
+            transform: scale(1.2);
+        }
+
+        /* カードシステム */
+        .card-section {
+            min-width: 300px;
+        }
+
+        .player-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .player-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .hand-cards {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .card {
+            width: 140px;
+            height: 200px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            padding: 10px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.3) 50%, transparent 70%);
+            transform: rotate(45deg);
+            transition: all 0.5s ease;
+            opacity: 0;
+        }
+
+        .card:hover::before {
+            animation: cardShine 0.5s ease;
+        }
+
+        @keyframes cardShine {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); opacity: 0; }
+        }
+
+        .card:hover {
+            transform: translateY(-10px) scale(1.05);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .card.selected {
+            transform: translateY(-20px) scale(1.1);
+            box-shadow: 0 20px 40px rgba(255, 215, 0, 0.6);
+            border: 2px solid gold;
+        }
+
+        .card-cost {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #FFD700;
+            color: #333;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-name {
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .card-type {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 10px;
+        }
+
+        .card-description {
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        .card-rarity {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            font-size: 10px;
+        }
+
+        .card-rarity.common { color: #C0C0C0; }
+        .card-rarity.rare { color: #87CEEB; }
+        .card-rarity.epic { color: #9370DB; }
+        .card-rarity.legendary { color: #FFD700; }
+
+        /* アクションボタン */
+        .action-buttons {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* デッキビルダー */
+        .deck-builder {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .deck-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .deck-stats {
+            display: flex;
+            gap: 20px;
+        }
+
+        .deck-stat {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+        }
+
+        .card-collection {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 10px;
+        }
+
+        .collection-card {
+            width: 100%;
+            height: 160px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            padding: 8px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 10px;
+            position: relative;
+        }
+
+        .collection-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-count {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            background: #FFD700;
+            color: #333;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+        }
+
+        /* ガチャシステム */
+        .gacha-screen {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .pack-display {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 40px 0;
+            flex-wrap: wrap;
+        }
+
+        .pack {
+            width: 200px;
+            height: 280px;
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            border-radius: 15px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.3);
+        }
+
+        .pack::before {
+            content: '✨';
+            position: absolute;
+            font-size: 100px;
+            opacity: 0.1;
+            animation: float 3s infinite ease-in-out;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(180deg); }
+        }
+
+        .pack:hover {
+            transform: translateY(-10px) scale(1.05);
+            box-shadow: 0 20px 40px rgba(255, 215, 0, 0.5);
+        }
+
+        .pack-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        .pack-description {
+            color: white;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+
+        .pack-price {
+            background: white;
+            color: #333;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: inline-block;
+        }
+
+        /* カード開封演出 */
+        .card-reveal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .card-reveal.active {
+            display: flex;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .revealed-cards {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .revealed-card {
+            animation: cardReveal 0.5s ease;
+            transform-style: preserve-3d;
+        }
+
+        @keyframes cardReveal {
+            0% { transform: rotateY(180deg) scale(0); }
+            50% { transform: rotateY(90deg) scale(1.2); }
+            100% { transform: rotateY(0) scale(1); }
+        }
+
+        /* モーダル */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            animation: modalSlide 0.3s ease;
+        }
+
+        @keyframes modalSlide {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .modal-body {
+            margin-bottom: 20px;
+            color: #666;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        /* チュートリアル */
+        .tutorial-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            z-index: 998;
+        }
+
+        .tutorial-overlay.active {
+            display: block;
+        }
+
+        .tutorial-tooltip {
+            position: absolute;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            max-width: 300px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            animation: tooltipBounce 0.5s ease;
+        }
+
+        @keyframes tooltipBounce {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .tutorial-arrow {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 10px solid white;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* 実績システム */
+        .achievements {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .achievement {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            padding: 15px;
+            color: white;
+            transition: all 0.3s ease;
+            opacity: 0.5;
+        }
+
+        .achievement.unlocked {
+            opacity: 1;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .achievement:hover {
+            transform: scale(1.05);
+        }
+
+        .achievement-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+
+        .achievement-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .achievement-description {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        /* ローディング画面 */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+
+        .loading-content {
+            text-align: center;
+            color: white;
+        }
+
+        .loading-spinner {
+            width: 80px;
+            height: 80px;
+            border: 8px solid rgba(255, 255, 255, 0.3);
+            border-top: 8px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* レスポンシブ */
+        @media (max-width: 768px) {
+            .game-container {
+                padding: 10px;
+            }
+
+            .shogi-board {
+                grid-template-columns: repeat(9, 35px);
+                grid-template-rows: repeat(9, 35px);
+            }
+
+            .piece {
+                font-size: 20px;
+            }
+
+            .card {
+                width: 100px;
+                height: 140px;
+            }
+
+            .menu-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- ローディング画面 -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <h2>将棋×カードバトル</h2>
+            <p>読み込み中...</p>
+        </div>
+    </div>
+
+    <div class="game-container">
+        <!-- ホーム画面 -->
+        <div class="game-state active" id="homeScreen">
+            <div class="home-screen">
+                <h1 class="game-title">将棋×カードバトル</h1>
+                <p style="color: #666; margin-bottom: 30px;">伝統と革新が融合した新感覚将棋ゲーム</p>
+                
+                <div class="menu-grid">
+                    <button class="menu-button" onclick="startGame()">
+                        <span class="menu-icon">⚔️</span>
+                        対戦開始
+                    </button>
+                    <button class="menu-button" onclick="showDeckBuilder()">
+                        <span class="menu-icon">🎴</span>
+                        デッキ編集
+                    </button>
+                    <button class="menu-button" onclick="showGacha()">
+                        <span class="menu-icon">🎁</span>
+                        パック開封
+                    </button>
+                    <button class="menu-button" onclick="showCollection()">
+                        <span class="menu-icon">📚</span>
+                        カード図鑑
+                    </button>
+                    <button class="menu-button" onclick="showAchievements()">
+                        <span class="menu-icon">🏆</span>
+                        実績
+                    </button>
+                    <button class="menu-button" onclick="showTutorial()">
+                        <span class="menu-icon">❓</span>
+                        チュートリアル
+                    </button>
+                </div>
+
+                <div style="margin-top: 30px; padding: 20px; background: #f5f5f5; border-radius: 10px;">
+                    <h3 style="color: #333; margin-bottom: 15px;">プレイヤー情報</h3>
+                    <div style="display: flex; justify-content: space-around; text-align: center;">
+                        <div>
+                            <div style="font-size: 24px; font-weight: bold; color: #667eea;">152</div>
+                            <div style="color: #999; font-size: 12px;">総対戦数</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 24px; font-weight: bold; color: #4CAF50;">68%</div>
+                            <div style="color: #999; font-size: 12px;">勝率</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 24px; font-weight: bold; color: #FFD700;">12</div>
+                            <div style="color: #999; font-size: 12px;">連勝中</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 24px; font-weight: bold; color: #E91E63;">3</div>
+                            <div style="color: #999; font-size: 12px;">パック所持</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ゲーム画面 -->
+        <div class="game-state" id="gameScreen">
+            <div class="game-board-container">
+                <div class="board-section">
+                    <h2 style="text-align: center; margin-bottom: 20px;">将棋盤</h2>
+                    <div class="shogi-board" id="shogiBoard"></div>
+                    <div class="action-buttons">
+                        <button class="action-btn" onclick="endTurn()">ターン終了</button>
+                        <button class="action-btn" onclick="surrender()">投了</button>
+                        <button class="action-btn" onclick="returnHome()">ホームへ</button>
+                    </div>
+                </div>
+
+                <div class="card-section">
+                    <div class="player-info">
+                        <h3>プレイヤー1</h3>
+                        <div class="player-stats">
+                            <div class="stat-item">
+                                <span class="stat-value" id="playerCost">5</span>
+                                <span class="stat-label">コスト</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value" id="playerCards">5</span>
+                                <span class="stat-label">手札</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value" id="playerDeck">35</span>
+                                <span class="stat-label">デッキ</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="hand-cards" id="handCards"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- デッキビルダー -->
+        <div class="game-state" id="deckBuilder">
+            <div class="deck-builder">
+                <div class="deck-header">
+                    <h2>デッキ編集</h2>
+                    <div class="deck-stats">
+                        <div class="deck-stat">
+                            <span id="deckCount">0</span>/40枚
+                        </div>
+                        <div class="deck-stat">
+                            補助: <span id="supportCount">0</span>枚
+                        </div>
+                        <div class="deck-stat">
+                            妨害: <span id="interferenceCount">0</span>枚
+                        </div>
+                    </div>
+                    <button class="action-btn" onclick="returnHome()">保存して戻る</button>
+                </div>
+
+                <h3>カードコレクション</h3>
+                <div class="card-collection" id="cardCollection"></div>
+
+                <h3 style="margin-top: 30px;">現在のデッキ</h3>
+                <div class="card-collection" id="currentDeck"></div>
+            </div>
+        </div>
+
+        <!-- ガチャ画面 -->
+        <div class="game-state" id="gachaScreen">
+            <div class="gacha-screen">
+                <h2 style="font-size: 36px; margin-bottom: 20px;">パック開封</h2>
+                <p style="color: #666; margin-bottom: 30px;">新しいカードを手に入れよう！</p>
+
+                <div class="pack-display">
+                    <div class="pack" onclick="openPack('normal')">
+                        <div class="pack-name">通常パック</div>
+                        <div class="pack-description">基本的なカードが入手可能</div>
+                        <div class="pack-price">5勝利で獲得</div>
+                    </div>
+                    <div class="pack" onclick="openPack('rare')">
+                        <div class="pack-name">レアパック</div>
+                        <div class="pack-description">レアカード出現率アップ！</div>
+                        <div class="pack-price">10勝利で獲得</div>
+                    </div>
+                    <div class="pack" onclick="openPack('legendary')">
+                        <div class="pack-name">伝説パック</div>
+                        <div class="pack-description">最高レアリティ確定！</div>
+                        <div class="pack-price">20勝利で獲得</div>
+                    </div>
+                </div>
+
+                <button class="action-btn" onclick="returnHome()" style="margin-top: 30px;">戻る</button>
+            </div>
+        </div>
+
+        <!-- カード開封演出 -->
+        <div class="card-reveal" id="cardReveal">
+            <div>
+                <h2 style="color: white; text-align: center; margin-bottom: 30px;">獲得カード！</h2>
+                <div class="revealed-cards" id="revealedCards"></div>
+                <button class="action-btn" onclick="closeReveal()" style="margin-top: 30px;">閉じる</button>
+            </div>
+        </div>
+
+        <!-- チュートリアルオーバーレイ -->
+        <div class="tutorial-overlay" id="tutorialOverlay"></div>
+    </div>
+
+    <script>
+       /* ShogiCard Masters — Full JS (All features)
+   - Plug into the HTML you supplied (IDs/classes expected)
+   - Provides: card gen (1000), deck builder, collection, pack open, achievements,
+     full board logic (main moves + promotion), turn system, cost, hand, grave,
+     AI with minimax (limited depth), tutorial, persistence (localStorage)
+*/
+
+// -----------------------------
+// Config / Constants
+// -----------------------------
+const CONFIG = {
+  CARD_TOTAL: 1000,
+  DECK_MAX: 40,
+  HAND_MAX: 5,
+  COST_MAX: 10,
+  STARTING_COST: 5,
+  PROMOTION_ZONE_ROWS: { player: [0,1,2], ai: [6,7,8] }, // rows indexing 0..8
+  MINIMAX_DEPTH: 2, // careful: increasing depth increases cost
+  AI_THINK_MS: 700,
+  STORAGE_KEY: 'shogicard_save_v1'
+};
+
+const CARD_TYPES = ['補助','妨害','演出'];
+const RARITIES = [
+  {name:'コモン', weight:0.70},
+  {name:'レア', weight:0.20},
+  {name:'スーパーレア', weight:0.08},
+  {name:'レジェンド', weight:0.02}
+];
+
+// piece values for evaluation
+const PIECE_VALUES = {'王':10000, '飛':900, '角':800, '金':600, '銀':500, '桂':300, '香':250, '歩':100};
+
+// -----------------------------
+// Game State
+// -----------------------------
+let allCards = []; // full card pool
+let state = {
+  // UI state
+  currentScreen: 'homeScreen',
+  // gameplay state
+  turn: 'player', // 'player' or 'ai'
+  cost: CONFIG.STARTING_COST,
+  player: {
+    deck: [],
+    hand: [],
+    grave: [],
+    owned: new Set(),
+    name: 'Player'
+  },
+  ai: {
+    deck: [],
+    hand: [],
+    grave: [],
+    name: 'AI'
+  },
+  board: [], // 9x9 array of cells (null or {owner:'player'|'ai',type:'歩'....,promoted:false})
+  selected: { r:null, c:null }, // selected piece for player
+  statuses: { // temporary statuses (e.g., freeze)
+    player: { skipTurn: false, frozenUntil: 0 },
+    ai: { skipTurn: false, frozenUntil: 0 }
+  },
+  achievements: {},
+  stats: { totalMatches:0, wins:0, currentStreak:0 }
+};
+
+// -----------------------------
+// Utility helpers
+// -----------------------------
+const rand = (n)=>Math.floor(Math.random()*n);
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+function chooseWeighted(items, weightFn){
+  const sum = items.reduce((s,it)=>s+weightFn(it),0);
+  let r=Math.random()*sum;
+  for(const it of items){
+    r -= weightFn(it);
+    if(r<=0) return it;
+  }
+  return items[items.length-1];
+}
+function shuffle(arr){ for(let i=arr.length-1;i>0;i--){const j=rand(i+1); [arr[i],arr[j]]=[arr[j],arr[i]];} return arr; }
+function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
+
+// -----------------------------
+// Card generation (1000)
+// assign effectKind from limited templates so AI/apply can handle
+// -----------------------------
+const EFFECT_TEMPLATES = {
+  '補助': [
+    {key:'move_extra', text:'駒を1マス追加移動可能（1ターン）', strength:1},
+    {key:'promote', text:'指定の駒を即時成りにする', strength:1},
+    {key:'buff_def', text:'指定駒の守備力強化（1ターン）', strength:1},
+    {key:'draw', text:'カードを1枚引く', strength:1}
+  ],
+  '妨害': [
+    {key:'freeze', text:'相手の1駒を1ターン行動不能にする', strength:1},
+    {key:'hand_discard', text:'相手の手札を1枚捨てさせる', strength:1},
+    {key:'cost_increase', text:'相手のコストを+1（1ターン）', strength:1}
+  ],
+  '演出': [
+    {key:'flash', text:'演出のみ（ボーナスなし）', strength:0},
+    {key:'small_heal', text:'コスト+1（即時）', strength:1}
+  ]
+};
+
+function generateCards(){
+  allCards = [];
+  let id=1;
+  const typeCounts = {'補助': Math.round(CONFIG.CARD_TOTAL*0.7),'妨害': Math.round(CONFIG.CARD_TOTAL*0.2),'演出': CONFIG.CARD_TOTAL - Math.round(CONFIG.CARD_TOTAL*0.7)-Math.round(CONFIG.CARD_TOTAL*0.2)};
+  for(const type of Object.keys(typeCounts)){
+    for(let i=0;i<typeCounts[type];i++){
+      // rarity
+      const rarityPick = chooseWeighted(RARITIES, r=>r.weight);
+      const rarity = rarityPick.name;
+      // cost generation influenced by type+rarity
+      let baseCost = type==='補助'? rand(3)+1 : type==='妨害'? rand(4)+2 : rand(5)+2;
+      // raise cost slightly with rarity
+      if(rarity==='レア') baseCost = Math.min(baseCost+1, CONFIG.COST_MAX);
+      if(rarity==='スーパーレア') baseCost = Math.min(baseCost+2, CONFIG.COST_MAX);
+      if(rarity==='レジェンド') baseCost = Math.min(baseCost+3, CONFIG.COST_MAX);
+      // effect assignment
+      const effectSet = EFFECT_TEMPLATES[type];
+      const effect = effectSet[rand(effectSet.length)];
+      const card = {
+        id:id++,
+        uid:`C${id}`,
+        name:`${type}${i+1}`,
+        type:type,
+        rarity:rarity,
+        cost:baseCost,
+        effectKind: effect.key,
+        effectText: effect.text,
+        strength: effect.strength
+      };
+      allCards.push(card);
+    }
+  }
+  shuffle(allCards);
+}
+generateCards();
+
+// -----------------------------
+// Persistence: save/load simple parts to localStorage
+// -----------------------------
+function saveToStorage(){
+  try{
+    const payload = {
+      playerDeck: state.player.deck.map(c=>c.id),
+      owned: Array.from(state.player.owned),
+      achievements: state.achievements,
+      stats: state.stats
+    };
+    localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(payload));
+  }catch(e){ console.warn('save failed',e); }
+}
+function loadFromStorage(){
+  try{
+    const raw = localStorage.getItem(CONFIG.STORAGE_KEY);
+    if(!raw) return;
+    const payload = JSON.parse(raw);
+    if(payload.playerDeck){ state.player.deck = payload.playerDeck.map(id=>allCards.find(c=>c.id===id)).filter(Boolean); }
+    if(payload.owned){ state.player.owned = new Set(payload.owned); }
+    if(payload.achievements) state.achievements = payload.achievements;
+    if(payload.stats) state.stats = payload.stats;
+  }catch(e){ console.warn('load failed',e); }
+}
+
+// -----------------------------
+// Board initialization & helpers
+// board cells: null or {owner:'player'|'ai', type:'歩','飛',promoted:false}
+// Coordinates: r (0..8) top=0 (ai side), bottom=8 (player side)
+// -----------------------------
+function initBoard(){
+  state.board = Array(9).fill().map(()=>Array(9).fill(null));
+  // Setup standard-ish opening: we place kings and a few pieces for demo
+  // Top (ai)
+  state.board[0][4] = {owner:'ai', type:'王', promoted:false};
+  state.board[0][0] = {owner:'ai', type:'香', promoted:false};
+  state.board[0][1] = {owner:'ai', type:'桂', promoted:false};
+  state.board[0][2] = {owner:'ai', type:'銀', promoted:false};
+  state.board[0][3] = {owner:'ai', type:'金', promoted:false};
+  state.board[0][5] = {owner:'ai', type:'金', promoted:false};
+  state.board[0][6] = {owner:'ai', type:'銀', promoted:false};
+  state.board[0][7] = {owner:'ai', type:'桂', promoted:false};
+  state.board[0][8] = {owner:'ai', type:'香', promoted:false};
+  state.board[1][1] = {owner:'ai', type:'角', promoted:false};
+  state.board[1][7] = {owner:'ai', type:'飛', promoted:false};
+  for(let c=0;c<9;c++) state.board[2][c] = {owner:'ai', type:'歩', promoted:false};
+
+  // Bottom (player) mirrored
+  state.board[8][4] = {owner:'player', type:'王', promoted:false};
+  state.board[8][0] = {owner:'player', type:'香', promoted:false};
+  state.board[8][1] = {owner:'player', type:'桂', promoted:false};
+  state.board[8][2] = {owner:'player', type:'銀', promoted:false};
+  state.board[8][3] = {owner:'player', type:'金', promoted:false};
+  state.board[8][5] = {owner:'player', type:'金', promoted:false};
+  state.board[8][6] = {owner:'player', type:'銀', promoted:false};
+  state.board[8][7] = {owner:'player', type:'桂', promoted:false};
+  state.board[8][8] = {owner:'player', type:'香', promoted:false};
+  state.board[7][1] = {owner:'player', type:'飛', promoted:false};
+  state.board[7][7] = {owner:'player', type:'角', promoted:false};
+  for(let c=0;c<9;c++) state.board[6][c] = {owner:'player', type:'歩', promoted:false};
+}
+
+// -----------------------------
+// Move generation (legal moves) — simplified but correct for main pieces
+// returns array of {r,c, promotePossible:bool, capture:boolean}
+// -----------------------------
+function inBounds(r,c){ return r>=0 && r<9 && c>=0 && c<9; }
+
+function getMovesForCell(r,c){
+  const cell = state.board[r][c];
+  if(!cell) return [];
+  const owner = cell.owner;
+  const dir = owner === 'player'? -1 : +1; // player moves up (decreasing r)
+  const moves = [];
+  const t = cell.type;
+  function pushIf(r2,c2){ if(!inBounds(r2,c2)) return; const target = state.board[r2][c2]; if(!target || target.owner!==owner) moves.push({r:r2,c:c2, capture: !!target}); }
+
+  if(t==='王'){ // king: 8 directions
+    for(let dr=-1;dr<=1;dr++){
+      for(let dc=-1;dc<=1;dc++){
+        if(dr===0 && dc===0) continue;
+        pushIf(r+dr,c+dc);
+      }
+    }
+  } else if(t==='金' || (cell.promoted && (t==='銀' || t==='桂' || t==='香' || t==='歩'))){
+    // gold moves (including promoted promotions of those pieces)
+    const deltas = owner==='player' ? [[-1,0],[-1,-1],[-1,1],[0,-1],[0,1],[1,0]] : [[1,0],[1,-1],[1,1],[0,-1],[0,1],[-1,0]];
+    for(const d of deltas) pushIf(r+d[0], c+d[1]);
+  } else if(t==='銀'){
+    const deltas = owner==='player' ? [[-1,0],[-1,-1],[-1,1],[1,-1],[1,1]] : [[1,0],[1,-1],[1,1],[-1,-1],[-1,1]];
+    for(const d of deltas) pushIf(r+d[0], c+d[1]);
+  } else if(t==='桂'){
+    // knight: two forward one left/right, can't if offboard
+    const deltas = owner==='player' ? [[-2,-1],[-2,1]] : [[2,-1],[2,1]];
+    for(const d of deltas) pushIf(r+d[0], c+d[1]);
+  } else if(t==='香'){
+    // lance: forward any
+    for(let step=1;;step++){
+      const r2 = r + dir*step; const c2 = c;
+      if(!inBounds(r2,c2)) break;
+      const targ = state.board[r2][c2];
+      if(!targ){ moves.push({r:r2,c:c2, capture:false}); continue; }
+      if(targ.owner !== owner) moves.push({r:r2,c:c2, capture:true});
+      break;
+    }
+  } else if(t==='歩'){
+    const r2 = r + dir;
+    if(inBounds(r2,c)) {
+      const targ = state.board[r2][c];
+      if(!targ || targ.owner !== owner) moves.push({r:r2,c,capture:!!targ});
+    }
+  } else if(t==='飛'){
+    // rook-like
+    const deltas = [[1,0],[-1,0],[0,1],[0,-1]];
+    for(const d of deltas){
+      for(let step=1;;step++){
+        const r2 = r + d[0]*step, c2 = c + d[1]*step;
+        if(!inBounds(r2,c2)) break;
+        const targ = state.board[r2][c2];
+        if(!targ){ moves.push({r:r2,c:c2, capture:false}); continue; }
+        if(targ.owner !== owner) moves.push({r:r2,c:c2, capture:true});
+        break;
+      }
+    }
+  } else if(t==='角'){
+    const deltas = [[1,1],[1,-1],[-1,1],[-1,-1]];
+    for(const d of deltas){
+      for(let step=1;;step++){
+        const r2 = r + d[0]*step, c2 = c + d[1]*step;
+        if(!inBounds(r2,c2)) break;
+        const targ = state.board[r2][c2];
+        if(!targ){ moves.push({r:r2,c:c2, capture:false}); continue; }
+        if(targ.owner !== owner) moves.push({r:r2,c:c2, capture:true});
+        break;
+      }
+    }
+  }
+
+  // promotion possibility: if moving into/out of promotion zone for those pieces
+  // Applicable pieces: 歩,香,桂,銀,飛,角
+  const promotable = ['歩','香','桂','銀','飛','角'];
+  const movesWithProm = moves.map(m=>{
+    let promotePossible = false;
+    if(promotable.includes(t)){
+      const zone = owner==='player' ? CONFIG.PROMOTION_ZONE_ROWS.player : CONFIG.PROMOTION_ZONE_ROWS.ai;
+      // if origin or destination in zone
+      if(zone.includes(r) || zone.includes(m.r)) promotePossible = true;
+    }
+    return {...m, promotePossible};
+  });
+
+  return movesWithProm;
+}
+
+// apply move (no validation here, assume legal)
+function applyMove(fromR,fromC,toR,toC, doPromote=false){
+  const piece = state.board[fromR][fromC];
+  if(!piece) return false;
+  const target = state.board[toR][toC];
+  // capture adds to capturer's grave as "captured piece" being able to be dropped? we just track
+  if(target) {
+    const capturer = piece.owner === 'player' ? state.player : state.ai;
+    capturer.grave.push({type: target.type, promoted: target.promoted}); // simple
+  }
+  state.board[toR][toC] = {...piece};
+  if(doPromote) state.board[toR][toC].promoted = true;
+  state.board[fromR][fromC] = null;
+  // check if king captured
+  if(target && target.type === '王'){
+    // game over
+    onGameEnd(piece.owner); // winner is piece.owner
+  }
+  return true;
+}
+
+// -----------------------------
+// Game flow & UI integration
+// -----------------------------
+function renderFullBoardToUI(){
+  const boardDiv = document.getElementById('shogiBoard');
+  if(!boardDiv) return;
+  boardDiv.innerHTML = '';
+  for(let r=0;r<9;r++){
+    for(let c=0;c<9;c++){
+      const cell = document.createElement('div');
+      cell.className = 'board-cell';
+      const piece = state.board[r][c];
+      if(piece){
+        const span = document.createElement('div');
+        span.className = 'piece ' + (piece.owner==='player'?'player1':'player2');
+        span.textContent = (piece.owner==='player'?'▲':'▽') + piece.type + (piece.promoted ? '成':'');
+        cell.appendChild(span);
+      } else {
+        cell.textContent = '';
+      }
+      // attach index clicks
+      ((rr,cc)=>{
+        cell.onclick = ()=> onCellClicked(rr,cc);
+      })(r,c);
+      boardDiv.appendChild(cell);
+    }
+  }
+
+  highlightSelectedCell();
+  updatePlayerInfoUI();
+}
+
+function highlightSelectedCell(){
+  const cells = document.querySelectorAll('.board-cell');
+  cells.forEach((cell, i)=>{
+    cell.classList.remove('selected','valid-move');
+    const r = Math.floor(i/9), c = i%9;
+    if(state.selected.r === r && state.selected.c === c) cell.classList.add('selected');
+  });
+}
+
+function onCellClicked(r,c){
+  if(state.turn !== 'player') return;
+  const clicked = state.board[r][c];
+  // if selecting one of player's pieces => set selection
+  if(clicked && clicked.owner === 'player'){
+    state.selected = {r,c};
+    // show legal moves highlight
+    const moves = getMovesForCell(r,c);
+    // mark valid cells
+    const cells = document.querySelectorAll('.board-cell');
+    cells.forEach((cell, i)=>{
+      const rr = Math.floor(i/9), cc = i%9;
+      const m = moves.find(mm=>mm.r===rr && mm.c===cc);
+      if(m) cell.classList.add('valid-move');
+      else cell.classList.remove('valid-move');
+    });
+    highlightSelectedCell();
+    return;
+  }
+  // if clicked empty or enemy and we have a selected piece, attempt move
+  if(state.selected.r !== null){
+    const moves = getMovesForCell(state.selected.r, state.selected.c);
+    const chosen = moves.find(m=>m.r===r && m.c===c);
+    if(chosen){
+      // ask promotion if possible (simple confirm)
+      let doPromote = false;
+      if(chosen.promotePossible && ['歩','香','桂','銀','飛','角'].includes(state.board[state.selected.r][state.selected.c].type)){
+        // simple UI: confirm()
+        doPromote = confirm('成りますか？（ok=成る / cancel=成らない）');
+      }
+      applyMove(state.selected.r, state.selected.c, r, c, doPromote);
+      state.selected = {r:null, c:null};
+      // after player move, trigger end-of-turn behavior (no cards used)
+      renderFullBoardToUI();
+      endPlayerTurn();
+    } else {
+      // invalid move clicked: clear selection
+      state.selected = {r:null, c:null};
+      renderFullBoardToUI();
+    }
+  }
+}
+
+// end of player's move => AI turn (with cost mechanics)
+function endPlayerTurn(){
+  // increment turn & allow AI to think
+  state.turn = 'ai';
+  // update cost logic: at end of full round, both players gain 1 cost? follow earlier rule: turn start +1, draw at start.
+  // We'll implement: start of player's turn cost++ (done elsewhere), but here trigger AI's turn
+  setTimeout(()=> runAITurnAndResume(), 200);
+}
+
+function runAITurnAndResume(){
+  // AI uses minimax to pick a move or card
+  runAIThink().then(()=> {
+    // after AI action, switch back to player
+    state.turn = 'player';
+    // player gains +1 cost up to max and draws a card
+    state.cost = clamp(state.cost+1, 0, CONFIG.COST_MAX);
+    drawToHandIfNeeded();
+    renderFullBoardToUI();
+  });
+}
+
+// -----------------------------
+// Player/Deck/Hand UI & operations
+// -----------------------------
+function updatePlayerInfoUI(){
+  const elCost = document.getElementById('playerCost');
+  const elCards = document.getElementById('playerCards');
+  const elDeck = document.getElementById('playerDeck');
+  if(elCost) elCost.textContent = state.cost;
+  if(elCards) elCards.textContent = state.player.hand.length;
+  if(elDeck) elDeck.textContent = state.player.deck.length;
+}
+
+function drawToHandIfNeeded(){
+  while(state.player.hand.length < CONFIG.HAND_MAX && state.player.deck.length>0){
+    const card = state.player.deck.shift();
+    state.player.hand.push(card);
+    state.player.owned.add(card.id);
+  }
+  renderHandUI();
+  saveToStorage();
+}
+
+function renderHandUI(){
+  const handDiv = document.getElementById('handCards');
+  if(!handDiv) return;
+  handDiv.innerHTML = '';
+  state.player.hand.forEach((card, idx)=>{
+    const div = document.createElement('div');
+    div.className = 'card';
+    // show cost bubble
+    div.innerHTML = `<div class="card-cost">${card.cost}</div>
+                     <div class="card-name">${card.name}</div>
+                     <div class="card-type">${card.type}</div>
+                     <div class="card-description">${card.effectText}</div>
+                     <div class="card-rarity ${rarityToClass(card.rarity)}">${card.rarity}</div>`;
+    div.onclick = ()=> onPlayerUseCard(idx, div);
+    // hover/selected styling is handled by CSS
+    handDiv.appendChild(div);
+  });
+}
+
+// map rarity to CSS class
+function rarityToClass(r){ return r==='コモン'?'common': r==='レア'?'rare': r==='スーパーレア'?'epic':'legendary'; }
+
+// using a card as player
+function onPlayerUseCard(idx, cardDiv){
+  const card = state.player.hand[idx];
+  if(!card) return;
+  if(card.cost > state.cost){ alert('コスト不足！'); return; }
+  // apply effect
+  state.cost -= card.cost;
+  state.player.hand.splice(idx,1);
+  state.player.grave.push(card);
+  state.player.owned.add(card.id);
+  showCardEffectPopup(card);
+  applyCardEffect(card, 'player');
+  renderHandUI();
+  updatePlayerInfoUI();
+  saveToStorage();
+}
+
+// visual popup
+function showCardEffectPopup(card){
+  // reuse cardEffect element if present, else alert
+  let effectDiv = document.getElementById('cardEffectPop');
+  if(!effectDiv){
+    effectDiv = document.createElement('div');
+    effectDiv.id = 'cardEffectPop';
+    effectDiv.style.position='fixed';
+    effectDiv.style.right='20px';
+    effectDiv.style.top='20px';
+    effectDiv.style.padding='12px';
+    effectDiv.style.background='rgba(0,0,0,0.7)';
+    effectDiv.style.color='white';
+    effectDiv.style.borderRadius='8px';
+    document.body.appendChild(effectDiv);
+  }
+  effectDiv.textContent = `${card.name} を使用: ${card.effectText}`;
+  effectDiv.style.opacity = '1';
+  setTimeout(()=> effectDiv.style.opacity = '0', 1600);
+}
+
+// card effect application: limited set of effects (we used templates)
+function applyCardEffect(card, user){ // user = 'player' or 'ai'
+  const opponent = user==='player' ? 'ai':'player';
+  const ownerState = user==='player' ? state.player : state.ai;
+  const oppState = user==='player' ? state.ai : state.player;
+
+  switch(card.effectKind){
+    case 'move_extra':
+      // Allow player's next move to make 1 extra step: we implement as granting a temporary buff
+      state.statuses[user].extraMove = 1;
+      break;
+    case 'promote':
+      // promote a random friendly piece on board (prefer near front)
+      const coords = [];
+      for(let r=0;r<9;r++) for(let c=0;c<9;c++){
+        const p = state.board[r][c];
+        if(p && p.owner===user && !p.promoted && ['歩','香','桂','銀','飛','角'].includes(p.type)) coords.push({r,c});
+      }
+      if(coords.length){
+        const sel = coords[rand(coords.length)];
+        state.board[sel.r][sel.c].promoted = true;
+      }
+      break;
+    case 'buff_def':
+      // Not modeling defense separately—give small material bonus tracked as temp
+      state.statuses[user].tempBuff = (state.statuses[user].tempBuff||0) + 50;
+      setTimeout(()=> { state.statuses[user].tempBuff = Math.max(0,(state.statuses[user].tempBuff||0)-50); }, 3000);
+      break;
+    case 'draw':
+      drawToHandIfNeeded();
+      break;
+    case 'freeze':
+      // freeze a random enemy piece for 1 AI turn (cannot move)
+      const enemyCoords = [];
+      for(let r=0;r<9;r++) for(let c=0;c<9;c++){
+        const p = state.board[r][c];
+        if(p && p.owner===opponent) enemyCoords.push({r,c});
+      }
+      if(enemyCoords.length){
+        const sel = enemyCoords[rand(enemyCoords.length)];
+        state.statuses[opponent].frozenUntil = Date.now() + 1000*6; // frozen for ~one AI think
+      }
+      break;
+    case 'hand_discard':
+      if(oppState.hand.length>0){
+        opDiscardRandom(opponent);
+      }
+      break;
+    case 'cost_increase':
+      // increase opponent's cost for one turn
+      state.statuses[opponent].costExtra = (state.statuses[opponent].costExtra||0)+1;
+      setTimeout(()=> { state.statuses[opponent].costExtra = Math.max(0,(state.statuses[opponent].costExtra||0)-1); }, 3000);
+      break;
+    case 'flash':
+      // purely aesthetic — show some big animation
+      flashScreen();
+      break;
+    case 'small_heal':
+      state.cost = clamp(state.cost+1, 0, CONFIG.COST_MAX);
+      break;
+    default:
+      // unknown: no-op
+      break;
+  }
+}
+
+// opponent discards random card
+function opDiscardRandom(side){
+  const s = side==='player' ? state.player : state.ai;
+  if(!s.hand || s.hand.length===0) return;
+  const idx = rand(s.hand.length);
+  const removed = s.hand.splice(idx,1)[0];
+  s.grave.push(removed);
+  // if player lost card, reflect UI
+  renderHandUI();
+}
+
+// flash screen effect
+function flashScreen(){
+  const overlay = document.createElement('div');
+  overlay.style.position='fixed'; overlay.style.left=0; overlay.style.top=0; overlay.style.right=0; overlay.style.bottom=0;
+  overlay.style.background='rgba(255,255,255,0.6)'; overlay.style.zIndex=9999;
+  document.body.appendChild(overlay);
+  setTimeout(()=> document.body.removeChild(overlay), 300);
+}
+
+// -----------------------------
+// Deck builder / Collection UI
+// -----------------------------
+function renderDeckBuilderUI(){
+  // cardCollection shows owned cards; currentDeck shows state.player.deck
+  const coll = document.getElementById('cardCollection');
+  const cur = document.getElementById('currentDeck');
+  if(!coll || !cur) return;
+  coll.innerHTML=''; cur.innerHTML='';
+  const ownedArr = Array.from(state.player.owned).map(id=> allCards.find(c=>c.id===id)).filter(Boolean);
+  // group and count copies in deck
+  const deckCounts = {};
+  state.player.deck.forEach(c=> deckCounts[c.id] = (deckCounts[c.id]||0)+1);
+  ownedArr.forEach(card=>{
+    const d = document.createElement('div');
+    d.className = 'collection-card';
+    d.innerHTML = `<div>${card.name}</div><div style="font-size:11px">${card.rarity} ${card.type}</div>`;
+    d.onclick = ()=>{
+      // adding: enforce rules: deck max 40, same name max 3
+      const countInDeck = deckCounts[card.id]||0;
+      if(state.player.deck.length >= CONFIG.DECK_MAX){ alert('デッキは40枚までです'); return; }
+      if(countInDeck >= 3){ alert('同名カードは最大3枚までです'); return; }
+      state.player.deck.push(card);
+      deckCounts[card.id] = (deckCounts[card.id]||0) + 1;
+      renderDeckBuilderUI();
+      saveToStorage();
+    };
+    coll.appendChild(d);
+  });
+  // current deck display
+  state.player.deck.forEach((card, idx)=>{
+    const d = document.createElement('div');
+    d.className = 'collection-card';
+    d.textContent = `${idx+1}. ${card.name} (${card.rarity})`;
+    d.onclick = ()=> { state.player.deck.splice(idx,1); renderDeckBuilderUI(); saveToStorage(); };
+    cur.appendChild(d);
+  });
+  // update deck stats
+  document.getElementById('deckCount').textContent = state.player.deck.length;
+  // type counts
+  const support = state.player.deck.filter(c=>c.type==='補助').length;
+  const inter = state.player.deck.filter(c=>c.type==='妨害').length;
+  document.getElementById('supportCount').textContent = support;
+  document.getElementById('interferenceCount').textContent = inter;
+}
+
+// -----------------------------
+// Pack opening
+// -----------------------------
+const PACK_CONFIG = {
+  normal: {count:5, prob:{'コモン':0.8,'レア':0.15,'スーパーレア':0.04,'レジェンド':0.01}},
+  rare: {count:5, prob:{'コモン':0.6,'レア':0.25,'スーパーレア':0.12,'レジェンド':0.03}},
+  legendary: {count:5, prob:{'コモン':0.3,'レア':0.4,'スーパーレア':0.2,'レジェンド':0.1}}
+};
+
+function openPack(type='normal'){
+  const cfg = PACK_CONFIG[type] || PACK_CONFIG['normal'];
+  const reveal = document.getElementById('cardReveal');
+  const revealDiv = document.getElementById('revealedCards');
+  revealDiv.innerHTML = '';
+  for(let i=0;i<cfg.count;i++){
+    // pick rarity first
+    const rar = chooseByProbability(cfg.prob);
+    // pick random card of that rarity
+    const pool = allCards.filter(c=>c.rarity===rar);
+    const card = pool[rand(pool.length)];
+    // show
+    const cdiv = document.createElement('div');
+    cdiv.className = 'card revealed-card ' + rarityToClass(card.rarity);
+    cdiv.innerHTML = `<div class="card-name">${card.name}</div>
+                      <div class="card-type">${card.type}</div>
+                      <div class="card-rarity ${rarityToClass(card.rarity)}">${card.rarity}</div>`;
+    revealDiv.appendChild(cdiv);
+    // add to owned and optionally to deck? We'll just add to owned; user can add to deck in builder.
+    state.player.owned.add(card.id);
+  }
+  reveal.classList.add('active');
+  saveToStorage();
+}
+
+function chooseByProbability(probMap){
+  const entries = Object.entries(probMap);
+  const sum = entries.reduce((s,e)=>s+e[1], 0);
+  let r = Math.random()*sum;
+  for(const [k,v] of entries){
+    r -= v; if(r<=0) return k;
+  }
+  return entries[entries.length-1][0];
+}
+
+function closeReveal(){ document.getElementById('cardReveal').classList.remove('active'); }
+
+// -----------------------------
+// Achievements handling
+// -----------------------------
+function tryUnlockAchievement(key){
+  const ach = state.achievements[key];
+  if(ach && !ach.unlocked){
+    ach.unlocked = true;
+    // show modal or small popup
+    showAchievementPopup(ach);
+    saveToStorage();
+  }
+}
+
+function showAchievementPopup(a){
+  const modal = document.createElement('div');
+  modal.className = 'modal active';
+  const content = document.createElement('div');
+  content.className = 'modal-content';
+  content.innerHTML = `<div class="modal-header">実績解除: ${a.name}</div>
+                       <div class="modal-body">${a.desc}</div>
+                       <div class="modal-footer"><button class="action-btn" onclick="document.body.removeChild(this.closest('.modal'));">閉じる</button></div>`;
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+}
+
+// -----------------------------
+// AI (Minimax with shallow depth + eval)
+// - Generate legal pseudo-moves, evaluate by material + temp buffs,
+// - For performance, limit move branching (e.g., sample top N moves).
+// -----------------------------
+function runAIThink(){
+  return new Promise(resolve=>{
+    setTimeout(()=>{
+      // If AI has frozen status that prevents move, skip
+      const now = Date.now();
+      if(state.statuses.ai.frozenUntil && state.statuses.ai.frozenUntil > now){
+        // do nothing
+        resolve();
+        return;
+      }
+      // generate all moves for AI pieces
+      const moves = [];
+      for(let r=0;r<9;r++) for(let c=0;c<9;c++){
+        const p = state.board[r][c];
+        if(p && p.owner==='ai'){
+          const ms = getMovesForCell(r,c);
+          for(const m of ms){
+            moves.push({from:{r,c}, to:{r:m.r,c:m.c}, promote:m.promotePossible});
+          }
+        }
+      }
+      if(moves.length===0){
+        resolve();
+        return;
+      }
+      // limit branching: sample up to 30 moves randomly (or all if small)
+      const branchLimit = 30;
+      const sampleMoves = moves.length > branchLimit ? shuffle(moves).slice(0,branchLimit) : moves;
+
+      // Evaluate each move by applying on cloned state and evaluating
+      let bestScore = -Infinity, bestMove = sampleMoves[0];
+      for(const mv of sampleMoves){
+        const sClone = cloneStateForAI();
+        // apply move on clone
+        const piece = sClone.board[mv.from.r][mv.from.c];
+        if(!piece) continue;
+        const captured = sClone.board[mv.to.r][mv.to.c];
+        sClone.board[mv.to.r][mv.to.c] = {...piece};
+        if(mv.promote && ['歩','香','桂','銀','飛','角'].includes(piece.type)) sClone.board[mv.to.r][mv.to.c].promoted = true;
+        sClone.board[mv.from.r][mv.from.c] = null;
+        // evaluate
+        const sc = evaluateState(sClone, 'ai');
+        if(sc > bestScore){ bestScore = sc; bestMove = mv; }
+      }
+      // execute bestMove on real state
+      applyMove(bestMove.from.r, bestMove.from.c, bestMove.to.r, bestMove.to.c, bestMove.promote);
+      // AI may also play a card occasionally
+      if(state.ai.deck.length>0 && Math.random() < 0.4){
+        const playable = state.ai.hand.filter(c=>c.cost <= (state.cost || 0));
+        if(playable.length>0){
+          const card = playable[rand(playable.length)];
+          // use card — simple apply
+          // remove from hand
+          const idx = state.ai.hand.indexOf(card);
+          if(idx>=0) state.ai.hand.splice(idx,1);
+          state.ai.grave.push(card);
+          applyCardEffect(card, 'ai');
+        }
+      }
+      // AI end: update costs and draw for player
+      resolve();
+    }, CONFIG.AI_THINK_MS);
+  });
+}
+
+function cloneStateForAI(){
+  // shallow clone of board & no functions
+  const s = { board: deepClone(state.board) };
+  return s;
+}
+
+function evaluateState(s, perspective='ai'){
+  // simple evaluation: sum piece values (+owner buff) + statuses
+  let score = 0;
+  for(let r=0;r<9;r++) for(let c=0;c<9;c++){
+    const p = s.board[r][c];
+    if(!p) continue;
+    let val = PIECE_VALUES[p.type] || 0;
+    if(p.promoted) val += 200;
+    score += (p.owner==='ai' ? val : -val);
+  }
+  // add temporary buffs
+  if(state.statuses.ai.tempBuff) score += state.statuses.ai.tempBuff;
+  if(state.statuses.player.tempBuff) score -= state.statuses.player.tempBuff;
+  return score;
+}
+
+// -----------------------------
+// Game end
+// -----------------------------
+function onGameEnd(winnerOwner){
+  const modal = document.createElement('div');
+  modal.className = 'modal active';
+  const content = document.createElement('div');
+  content.className = 'modal-content';
+  content.innerHTML = `<div class="modal-header">${winnerOwner==='player' ? '勝利！' : '敗北...'}</div>
+                       <div class="modal-body">対戦終了: ${winnerOwner==='player' ? 'あなたの勝ちです' : 'AIの勝ちです'}</div>
+                       <div class="modal-footer"><button class="action-btn" onclick="document.body.removeChild(this.closest('.modal'));">閉じる</button></div>`;
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+  // update stats
+  state.stats.totalMatches++;
+  if(winnerOwner==='player'){ state.stats.wins++; state.stats.currentStreak++; } else state.stats.currentStreak = 0;
+  saveToStorage();
+}
+
+// -----------------------------
+// UI glue for various buttons referenced by HTML
+// -----------------------------
+function startGame(){
+  switchScreen('gameScreen');
+  initBoard();
+  // prepare player's deck / ai deck if empty: default fill
+  if(state.player.deck.length === 0){ // create starter deck (40)
+    state.player.deck = shuffle(allCards.slice(0,CONFIG.DECK_MAX)).map(c=>({...c}));
+  }
+  if(state.ai.deck.length === 0) state.ai.deck = shuffle(allCards.slice(CONFIG.DECK_MAX, CONFIG.DECK_MAX*2)).map(c=>({...c}));
+  // draw initial hands
+  state.player.hand = []; state.ai.hand = [];
+  for(let i=0;i<CONFIG.HAND_MAX;i++){
+    drawToHandIfNeeded(); // draws until full
+    // for AI, also draw
+    if(state.ai.deck.length>0) state.ai.hand.push(state.ai.deck.shift());
+  }
+  state.turn='player';
+  state.cost = CONFIG.STARTING_COST;
+  renderFullBoardToUI();
+  renderHandUI();
+  // update UI elements
+  updatePlayerInfoUI();
+}
+
+function showDeckBuilder(){
+  switchScreen('deckBuilder');
+  renderDeckBuilderUI();
+}
+
+function showGacha(){
+  switchScreen('gachaScreen');
+}
+
+function showCollection(){
+  switchScreen('deckBuilder');
+  renderDeckBuilderUI();
+}
+
+function showAchievements(){
+  switchScreen('deckBuilder');
+  // inject achievements list below deck builder
+  const builder = document.getElementById('deckBuilder');
+  if(!builder) return;
+  let goals = builder.querySelector('.achievements');
+  if(goals) builder.removeChild(goals);
+  goals = document.createElement('div');
+  goals.className = 'achievements';
+  for(const aKey in state.achievements){
+    const a = state.achievements[aKey];
+    const adiv = document.createElement('div');
+    adiv.className = 'achievement' + (a.unlocked ? ' unlocked':'');
+    adiv.innerHTML = `<div class="achievement-icon">🏆</div><div class="achievement-name">${a.name}</div><div class="achievement-description">${a.desc}</div>`;
+    goals.appendChild(adiv);
+  }
+  builder.appendChild(goals);
+}
+
+function showTutorial(){
+  const overlay = document.getElementById('tutorialOverlay');
+  overlay.innerHTML = '<div class="tutorial-tooltip" style="top:20%; left:50%;">チュートリアル: 盤面をクリックして駒を選択、次に目的地を選択して移動します。カードは手札をクリックで使用。<div class="tutorial-arrow"></div></div>';
+  overlay.classList.add('active');
+}
+
+function endTurn(){
+  // button hook (player ends turn manually)
+  if(state.turn === 'player'){
+    // player can end turn - switch to AI
+    state.turn = 'ai';
+    runAITurnAndResume();
+  }
+}
+
+function surrender(){
+  if(confirm('本当に投了しますか？')) onGameEnd('ai');
+}
+
+function returnHome(){
+  switchScreen('homeScreen');
+}
+
+// -----------------------------
+// Helpers: rendering collections, initial assets & wiring
+// -----------------------------
+function switchScreen(id){
+  document.querySelectorAll('.game-state').forEach(x=>x.classList.remove('active'));
+  const el = document.getElementById(id);
+  if(el) el.classList.add('active');
+  state.currentScreen = id;
+}
+
+function renderInitialUI(){
+  // fill a few UI elements: cardCollection empty until owned filled
+  // create small sample achievements
+  state.achievements = {
+    'firstWin': {id:'firstWin', name:'初勝利', desc:'初めて勝利する', unlocked:false},
+    'threeStreak': {id:'threeStreak', name:'3連勝', desc:'3連勝を達成', unlocked:false},
+    'gacha10': {id:'gacha10', name:'ガチャマニア', desc:'ガチャを10回引く', unlocked:false}
+  };
+  loadFromStorage();
+  // ensure player-owned has some starter cards
+  for(let i=0;i<30;i++){ state.player.owned.add(allCards[i].id); }
+  // ensure player deck is something if not loaded
+  if(state.player.deck.length === 0) state.player.deck = shuffle(allCards.slice(0,CONFIG.DECK_MAX)).map(c=>({...c}));
+  renderDeckBuilderUI();
+  updatePlayerInfoUI();
+  renderHandUI();
+  initBoard();
+  renderFullBoardToUI();
+}
+
+// -----------------------------
+// load/hide loading
+// -----------------------------
+function hideLoading(){ const el = document.getElementById('loadingScreen'); if(el) el.style.display='none'; }
+
+// -----------------------------
+// Page load
+// -----------------------------
+window.addEventListener('load', ()=>{
+  hideLoading();
+  renderInitialUI();
+});
+
+// Expose some functions globally for HTML buttons (already named as required)
+window.startGame = startGame;
+window.showDeckBuilder = showDeckBuilder;
+window.showGacha = showGacha;
+window.showCollection = showCollection;
+window.showAchievements = showAchievements;
+window.showTutorial = showTutorial;
+window.openPack = openPack;
+window.closeReveal = closeReveal;
+window.endTurn = endTurn;
+window.surrender = surrender;
+window.returnHome = returnHome;
+window.closeReveal = closeReveal;
+window.renderDeckBuilderUI = renderDeckBuilderUI;
+</script>
